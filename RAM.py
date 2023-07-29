@@ -1,17 +1,20 @@
 from cvzone.HandTrackingModule import HandDetector
 import cv2
-import serial 
 import time
 from pyfirmata import Arduino, SERVO
+import platform
 
-import pyfirmata
-import time
-board = Arduino("/dev/ttyUSB0")
+if platform.system() == "Windows":
+    port = "COM3"
+else:
+    port = "/dev/ttyUSB0"
+board = Arduino(port)
 print("Communication Successfully started")
-
+board.digital[2].mode = SERVO
+board.digital[2].write(0)
 for i in range(180):
     angle = i + 1
-    board.digital[2].write(90)
+    board.digital[2].write(i)
     print(angle)              
     time.sleep(0.01) 
 
