@@ -16,6 +16,19 @@ print("Communication Successfully started")
 direction = 2
 cap = cv2.VideoCapture(0)
 detector = HandDetector(detectionCon=0.8, maxHands=1)
+
+
+def move(finger, currentPos, pos):
+    if currentPos > pos:
+        while board.digital[finger].read() > pos:
+                board.digital[finger].write(board.digital[finger].read() - 1)
+                time.sleep(0.01) 
+    if currentPos < pos:
+        while board.digital[finger].read() < pos:
+            board.digital[finger].write(board.digital[finger].read() + 1)
+            time.sleep(0.01) 
+
+
 while True:
     if direction == 0:
         if board.digital[2].read() > 170:
@@ -45,6 +58,10 @@ while True:
     cv2.imshow("Image", img)
     cv2.waitKey(1)
     print(f"{handType} hand fingers up: {fingersUp}")
+
+    for finger in fingersUp:
+        move(finger, board.digital[finger].read(), pos) #sort this out
+
     if fingersUp[2] == 0:
         direction = 0 #down
     else:
