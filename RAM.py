@@ -3,6 +3,10 @@ import cv2
 import time
 from pyfirmata import Arduino, SERVO
 import platform
+import threading
+#180 degrees is fully up, 0 is fully down
+#fingersUp array is in order of thumb to pinky
+fingerPins = [2,4,7,8,12]
 
 
 if platform.system() == "Windows":
@@ -11,61 +15,71 @@ else:
     port = "/dev/ttyUSB0"
 
 board = Arduino(port)
-board.digital[2].mode = SERVO
+
+for finger in fingerPins:
+    board.digital[finger].mode = SERVO
+    if finger == 2:
+        board.digital[finger].write(360)
+    else:
+        board.digital[finger].write(180)
+
+
 print("Communication Successfully started")
-direction = 2
 cap = cv2.VideoCapture(0)
 detector = HandDetector(detectionCon=0.8, maxHands=1)
 
-
-def move(finger, currentPos, pos):
+def move(finger, pos):
+    currentPos = board.digital[finger].read()
     if currentPos > pos:
         while board.digital[finger].read() > pos:
                 board.digital[finger].write(board.digital[finger].read() - 1)
-                time.sleep(0.01) 
+                time.sleep(0.0025) 
     if currentPos < pos:
         while board.digital[finger].read() < pos:
             board.digital[finger].write(board.digital[finger].read() + 1)
-            time.sleep(0.01) 
+            time.sleep(0.0025) 
+
+def get(fingersUp):
+    output = []
+    fingerNum = 0
+    for finger in fingersUp:
+        if finger == 0:
+            output.append(0)
+        if finger == 1:
+            if fingerNum == 0:
+                output.append(360)
+            else:
+                output.append(180)
+        fingerNum += 1
+    return output 
+
 
 
 while True:
-    if direction == 0:
-        if board.digital[2].read() > 170:
-            while board.digital[2].read() > 1:
-                board.digital[2].write(board.digital[2].read() - 1)
-                time.sleep(0.01) 
-
-    if direction == 1:
-        if board.digital[2].read() < 10:
-            while board.digital[2].read() < 180:
-                board.digital[2].write(board.digital[2].read() + 1)
-                time.sleep(0.01) 
-
-
+    threads = []
+    fingerNum = 0
 
     success, img = cap.read()
     hands, img = detector.findHands(img)  
     if hands:
         hand = hands[0]
         lmList = hand["lmList"] 
-        bbox1 = hand["bbox"] 
+        bbox1 = hand["bbox"]
         centerPoint = hand['center'] 
         handType = hand["type"] 
 
         fingersUp = detector.fingersUp(hand)
+        print(f"{handType} hand fingers up: {fingersUp}")
 
+        for finger in get(fingersUp):
+            threads.append(threading.Thread(target=move(fingerPins[fingerNum], finger)))
+            fingerNum += 1
+    for th in threads:
+        th.start() # Starts the thread
+    for th in threads:
+        th.join() # Waits for the thread to terminate
     cv2.imshow("Image", img)
     cv2.waitKey(1)
-    print(f"{handType} hand fingers up: {fingersUp}")
 
-    for finger in fingersUp:
-        move(finger, board.digital[finger].read(), pos) #sort this out
-
-    if fingersUp[2] == 0:
-        direction = 0 #down
-    else:
-        direction = 1 #up
-        
 cap.release()
 cv2.destroyAllWindows()
