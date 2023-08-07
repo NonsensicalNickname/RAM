@@ -5,6 +5,7 @@ from pyfirmata import Arduino, SERVO
 import platform
 import threading
 #180 degrees is fully up, 0 is fully down
+#for thumb, 360 is loose and 0 is tight
 #fingersUp array is in order of thumb to pinky
 fingerPins = [2,4,7,8,12]
 
@@ -16,7 +17,7 @@ else:
 
 board = Arduino(port)
 
-for finger in fingerPins:
+for finger in fingerPins: #set the mode for each pin in use and move all fingers to initial position
     board.digital[finger].mode = SERVO
     if finger == 2:
         board.digital[finger].write(360)
@@ -28,7 +29,7 @@ print("Communication Successfully started")
 cap = cv2.VideoCapture(0)
 detector = HandDetector(detectionCon=0.8, maxHands=1)
 
-def move(finger, pos):
+def move(finger, pos): # move le finger to specified angle 
     currentPos = board.digital[finger].read()
     if currentPos > pos:
         while board.digital[finger].read() > pos:
@@ -39,7 +40,7 @@ def move(finger, pos):
             board.digital[finger].write(board.digital[finger].read() + 1)
             time.sleep(0.0025) 
 
-def get(fingersUp):
+def get(fingersUp): # determine what angle le finger should be moved to
     output = []
     fingerNum = 0
     for finger in fingersUp:
@@ -62,6 +63,7 @@ while True:
     success, img = cap.read()
     hands, img = detector.findHands(img)  
     if hands:
+        #get hand info 
         hand = hands[0]
         lmList = hand["lmList"] 
         bbox1 = hand["bbox"]
@@ -69,16 +71,16 @@ while True:
         handType = hand["type"] 
 
         fingersUp = detector.fingersUp(hand)
-        print(f"{handType} hand fingers up: {fingersUp}")
+        print(f"{handType} hand fingers up: {fingersUp}") 
 
-        for finger in get(fingersUp):
+        for finger in get(fingersUp): # add finger movements to thread list
             threads.append(threading.Thread(target=move(fingerPins[fingerNum], finger)))
             fingerNum += 1
     for th in threads:
-        th.start() # Starts the thread
+        th.start() # start threads
     for th in threads:
-        th.join() # Waits for the thread to terminate
-    cv2.imshow("Image", img)
+        th.join() # wait for threads
+    cv2.imshow("Image", img) # output frame
     cv2.waitKey(1)
 
 cap.release()
